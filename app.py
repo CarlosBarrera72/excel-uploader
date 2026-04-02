@@ -1,4 +1,5 @@
-from flask import Flask, render_template, request # type: ignore
+from flask import Flask, render_template, request, jsonify
+import pandas as pd
 import os 
 
 app = Flask(__name__)
@@ -15,18 +16,34 @@ def index():
 
 @app.route("/upload", methods=["POST"])
 def upload_file():
-    if "file" not in request.files:
-        return "No file uploaded"
-    
-    file = request.file["file"]
+    file = request.files.get("file")
 
-    if file.filename == "":
-        return "No file selected"
-    
-    filepath = os.path.join(app.config["UPLOAD_FOLDER"], file.filename)
+    if not file or file.filename == "":
+        return jsonify({"No file selected"}), 400
+   
+    filename = file.filename or ""
+    filepath = os.path.join(str(UPLOAD_FOLDER), str(filename))
     file.save(filepath)
 
-    return f"Uploaded: {file.filename}"
+    lower_name = filename.lower()
+
+    try:
+        if lower_name.endswith(".xlsx"):
+            df = pd.read_excel(filepath, engine="openpyxl")
+        elif lower_name.endswith(".csv"):
+            df = pd.read_csv(filepath)
+        else:
+            return jsonify({"error": "Unsupported file type. Use .xlsx or .csv"}), 400
+
+        coulmns = df.columns.tolist()
+
+        return jsonify({
+            "message": "Upload successful",
+            "filename": filename,
+            "columns": coulmns
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":
     app.run(debug=True)

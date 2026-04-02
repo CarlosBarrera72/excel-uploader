@@ -2,6 +2,7 @@
 <html>
 <head>
     <title>Excel Uploader</title>
+    <link rel="stylesheet" href="{{url_for('static', filename="style.css") }}">
 </head>
 <body>
 
@@ -11,6 +12,10 @@
         <input type="file" name="file" accept=".xlsx,.csv">
         <button type="submit">Upload</button>
     </form>
+
+    <p id="status"></p>
+
+    <script src=""{{url_for('static', filename='script.js') }}></script>
 
 </body>
 </html>
