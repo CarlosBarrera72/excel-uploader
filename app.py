@@ -44,6 +44,24 @@ def upload_file():
         })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+    
+@app.route("/process", methods=["POST"])
+def process_file():
+    data = request.get_json()
+
+    if not data:
+        return jsonify({"error": "No JSON data recieved"}), 400
+    
+    filename = data.get("filename")
+    selected_columns = data.get("selected_coulmns")
+
+    if not filename or not selected_columns:
+        return jsonify({"error": "Missing filename or selected columns"}), 400
+    
+    filepath = os.path.join(str(UPLOAD_FOLDER), str(filename))
+
+    if not os.path.exists(filepath):
+        return jsonify({"Error": "File not found"}), 400
 
 if __name__ == "__main__":
     app.run(debug=True)
