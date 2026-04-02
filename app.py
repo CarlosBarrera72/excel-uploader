@@ -19,9 +19,12 @@ def upload_file():
     file = request.files.get("file")
 
     if not file or file.filename == "":
-        return jsonify({"No file selected"}), 400
+        return jsonify({"error": "No file selected"}), 400
    
     filename = file.filename or ""
+    if not filename:
+        return jsonify({"error": "No file selected"}), 400
+    
     filepath = os.path.join(str(UPLOAD_FOLDER), str(filename))
     file.save(filepath)
 
@@ -29,22 +32,71 @@ def upload_file():
 
     try:
         if lower_name.endswith(".xlsx"):
-            df = pd.read_excel(filepath, engine="openpyxl")
+            df = pd.read_excel(filepath, header=None, engine="openpyxl")
         elif lower_name.endswith(".csv"):
-            df = pd.read_csv(filepath)
+            df = pd.read_csv(filepath, header=None)
         else:
             return jsonify({"error": "Unsupported file type. Use .xlsx or .csv"}), 400
-
-        coulmns = df.columns.tolist()
+        
+        df = df.fillna("")
+        preview_rows = df.head(10).values.tolist()
+        
 
         return jsonify({
             "message": "Upload successful",
             "filename": filename,
-            "columns": coulmns
-        })
+            "preview_rows": preview_rows
+        }), 200
+    
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-    
+
+@app.route("/set-header", methods=["POST"])
+def set_header():
+    data = request.get_json()
+
+    if not data:
+        return jsonify({"error": "No JSON data received"}), 400
+
+    filename = data.get("filename")
+    header_row_index = data.get("header_row_index")
+
+    if filename is None or header_row_index is None:
+        return jsonify({"error": "Missing filename or header row index"}), 400
+
+    filepath = os.path.join(UPLOAD_FOLDER, filename)
+
+    if not os.path.exists(filepath):
+        return jsonify({"error": "File not found"}), 404
+
+    lower_name = filename.lower()
+
+    try:
+        if lower_name.endswith(".xlsx"):
+            df = pd.read_excel(filepath, header=None, engine="openpyxl")
+        elif lower_name.endswith(".csv"):
+            df = pd.read_csv(filepath, header=None)
+        else:
+            return jsonify({"error": "Unsupported file type"}), 400
+
+        df = df.fillna("")
+
+        headers = df.iloc[header_row_index].tolist()
+        headers = [str(h).strip() for h in headers]
+
+        df = df.iloc[header_row_index + 1:].reset_index(drop=True)
+        df.columns = headers
+
+        return jsonify({
+            "message": "Header row set successfully",
+            "filename": filename,
+            "columns": headers
+        }), 200
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route("/process", methods=["POST"])
 def process_file():
     data = request.get_json()
@@ -54,13 +106,11 @@ def process_file():
         return jsonify({"error": "No JSON data recieved"}), 400
     
     filename = data.get("filename")
+    header_row_index = data.get("header_row_index")
     selected_columns = data.get("selected_columns")
 
-    print("filename:", filename)
-    print("selected_columns:", selected_columns)
-
-    if not filename or not selected_columns:
-        return jsonify({"error": "Missing filename or selected columns"}), 400
+    if filename is None or header_row_index is None or not selected_columns:
+        return jsonify({"error": "Missing filename, header row index, or selected columns"}), 400
     
     filepath = os.path.join(str(UPLOAD_FOLDER), str(filename))
 
@@ -71,12 +121,20 @@ def process_file():
 
     try:
         if lower_name.endswith(".xlsx"):
-            df = pd.read_excel(filepath, engine="openpyxl")
+            df = pd.read_excel(filepath, header=None, engine="openpyxl")
         elif lower_name.endswith(".csv"):
-            df = pd.read_csv(filepath)
+            df = pd.read_csv(filepath, header=None)
         else:
             return jsonify({"error": "Unsupported file type"}), 400
         
+        df = df.fillna("")
+        
+        headers = df.iloc[header_row_index].tolist()
+        header = [str(h).strip() for h in headers]
+
+        df = df.iloc[header_row_index + 1:].reset_index(drop=True)
+        df.columns = headers
+
         df = df[selected_columns]
         df = df.fillna("")
 

@@ -17,9 +17,15 @@
 
         <p id="status"></p>
 
+        <div id="preview-section" class="hidden">
+            <h2>Preview Uploaded File</h2>
+            <p>Click a row number to use that row as the header row.</p>
+            <div id="preview-table-container"></div>
+        </div>
+
         <div id="columns-section" class="hidden">
             <h2>Select Columns</h2>
-            <p>Click columns in the order you want them displayed.</p>
+            <p>Click the column names in the order you want them displayed.</p>
             <div id="columns-list"></div>
             <button id="process-btn" type="button">Process File</button>
         </div>
@@ -30,6 +36,6 @@
         </div>
     </div>
 
-    <script src="{{url_for('static', filename='script.js')}}"></script>
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
 </body>
 </html>

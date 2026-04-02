@@ -1,16 +1,22 @@
+console.log("script loaded");
+
 const uploadForm = document.getElementById("upload-form");
 const fileInput = document.getElementById("file-input");
 const statusText = document.getElementById("status");
+
+const previewSection = document.getElementById("preview-section");
+const previewTableContainer = document.getElementById("preview-table-container");
+
 const columnsSection = document.getElementById("columns-section");
 const columnsList = document.getElementById("columns-list");
 const processBtn = document.getElementById("process-btn");
+
 const tableSection = document.getElementById("table-section");
 const tableContainer = document.getElementById("table-container");
 
 let currentFilename = "";
+let currentHeaderRowIndex = null;
 let selectedColumns = [];
-
-console.log("Script loaded")
 
 uploadForm.addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -34,6 +40,7 @@ uploadForm.addEventListener("submit", async (event) => {
         });
 
         const result = await response.json();
+        console.log("upload result:", result);
 
         if (!response.ok) {
             statusText.textContent = result.error || "Upload failed.";
@@ -41,20 +48,119 @@ uploadForm.addEventListener("submit", async (event) => {
         }
 
         currentFilename = result.filename;
+        currentHeaderRowIndex = null;
+        selectedColumns = [];
+
+        statusText.textContent = result.message;
+
+        columnsSection.classList.add("hidden");
+        tableSection.classList.add("hidden");
+
+        renderPreviewTable(result.preview_rows);
+
+    } catch (error) {
+        console.error(error);
+        statusText.textContent = "Something went wrong during upload.";
+    }
+});
+
+function renderPreviewTable(rows) {
+    previewSection.classList.remove("hidden");
+    previewTableContainer.innerHTML = "";
+
+    const table = document.createElement("table");
+
+    const thead = document.createElement("thead");
+    const headerRow = document.createElement("tr");
+
+    const rowHeader = document.createElement("th");
+    rowHeader.textContent = "Row";
+    headerRow.appendChild(rowHeader);
+
+    const maxColumns = rows.reduce((max, row) => Math.max(max, row.length), 0);
+
+    for (let i = 0; i < maxColumns; i++) {
+        const th = document.createElement("th");
+        th.textContent = `Column ${i + 1}`;
+        headerRow.appendChild(th);
+    }
+
+    thead.appendChild(headerRow);
+    table.appendChild(thead);
+
+    const tbody = document.createElement("tbody");
+
+    rows.forEach((row, rowIndex) => {
+        const tr = document.createElement("tr");
+
+        const rowButtonCell = document.createElement("td");
+        const rowButton = document.createElement("button");
+        rowButton.type = "button";
+        rowButton.textContent = `Use Row ${rowIndex + 1}`;
+        rowButton.classList.add("row-select-btn");
+
+        rowButton.addEventListener("click", () => {
+            setHeaderRow(rowIndex);
+        });
+
+        rowButtonCell.appendChild(rowButton);
+        tr.appendChild(rowButtonCell);
+
+        for (let i = 0; i < maxColumns; i++) {
+            const td = document.createElement("td");
+            td.textContent = row[i] ?? "";
+            tr.appendChild(td);
+        }
+
+        tbody.appendChild(tr);
+    });
+
+    table.appendChild(tbody);
+    previewTableContainer.appendChild(table);
+}
+
+async function setHeaderRow(rowIndex) {
+    if (!currentFilename) {
+        statusText.textContent = "No uploaded file found.";
+        return;
+    }
+
+    statusText.textContent = `Setting Row ${rowIndex + 1} as header...`;
+
+    try {
+        const response = await fetch("/set-header", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                filename: currentFilename,
+                header_row_index: rowIndex
+            })
+        });
+
+        const result = await response.json();
+        console.log("set-header result:", result);
+
+        if (!response.ok) {
+            statusText.textContent = result.error || "Failed to set header row.";
+            return;
+        }
+
+        currentHeaderRowIndex = rowIndex;
         selectedColumns = [];
 
         statusText.textContent = result.message;
         renderColumns(result.columns);
 
     } catch (error) {
-        statusText.textContent = "Something went wrong during upload.";
         console.error(error);
+        statusText.textContent = "Something went wrong while setting the header row.";
     }
-});
+}
 
 function renderColumns(columns) {
     columnsSection.classList.remove("hidden");
-    tableSection.classList.add("hidden");
     columnsList.innerHTML = "";
 
     columns.forEach((column) => {
@@ -64,10 +170,15 @@ function renderColumns(columns) {
         button.classList.add("column-btn");
 
         button.addEventListener("click", () => {
-            if (!selectedColumns.includes(column)) {
+            if (selectedColumns.includes(column)) {
+                selectedColumns = selectedColumns.filter((col) => col !== column);
+                button.classList.remove("selected");
+            } else {
                 selectedColumns.push(column);
                 button.classList.add("selected");
             }
+
+            console.log("selectedColumns:", selectedColumns);
         });
 
         columnsList.appendChild(button);
@@ -75,8 +186,18 @@ function renderColumns(columns) {
 }
 
 processBtn.addEventListener("click", async () => {
-    if (!currentFilename || selectedColumns.length === 0) {
-        statusText.textContent = "Select at least one column.";
+    if (!currentFilename) {
+        statusText.textContent = "No uploaded file found.";
+        return;
+    }
+
+    if (currentHeaderRowIndex === null) {
+        statusText.textContent = "Please choose a header row first.";
+        return;
+    }
+
+    if (selectedColumns.length === 0) {
+        statusText.textContent = "Please select at least one column.";
         return;
     }
 
@@ -90,14 +211,13 @@ processBtn.addEventListener("click", async () => {
             },
             body: JSON.stringify({
                 filename: currentFilename,
+                header_row_index: currentHeaderRowIndex,
                 selected_columns: selectedColumns
             })
         });
 
         const result = await response.json();
-
         console.log("process result:", result);
-        console.log("response ok:", response.ok);
 
         if (!response.ok) {
             statusText.textContent = result.error || "Processing failed.";
@@ -105,17 +225,22 @@ processBtn.addEventListener("click", async () => {
         }
 
         statusText.textContent = result.message;
-        renderTable(result.columns, result.rows);
+        renderProcessedTable(result.columns, result.rows);
 
     } catch (error) {
-        statusText.textContent = "Something went wrong during processing.";
         console.error(error);
+        statusText.textContent = "Something went wrong during processing.";
     }
 });
 
-function renderTable(columns, rows) {
+function renderProcessedTable(columns, rows) {
     tableSection.classList.remove("hidden");
     tableContainer.innerHTML = "";
+
+    if (!rows || rows.length === 0) {
+        tableContainer.innerHTML = "<p>No rows returned.</p>";
+        return;
+    }
 
     const table = document.createElement("table");
 
