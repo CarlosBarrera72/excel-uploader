@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request
+from flask import Flask, render_template, request # type: ignore
 import os 
 
 app = Flask(__name__)
