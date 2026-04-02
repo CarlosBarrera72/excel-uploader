@@ -48,12 +48,16 @@ def upload_file():
 @app.route("/process", methods=["POST"])
 def process_file():
     data = request.get_json()
+    print("RAW JSON:", data)
 
     if not data:
         return jsonify({"error": "No JSON data recieved"}), 400
     
     filename = data.get("filename")
-    selected_columns = data.get("selected_coulmns")
+    selected_columns = data.get("selected_columns")
+
+    print("filename:", filename)
+    print("selected_columns:", selected_columns)
 
     if not filename or not selected_columns:
         return jsonify({"error": "Missing filename or selected columns"}), 400
@@ -61,7 +65,30 @@ def process_file():
     filepath = os.path.join(str(UPLOAD_FOLDER), str(filename))
 
     if not os.path.exists(filepath):
-        return jsonify({"Error": "File not found"}), 400
+        return jsonify({"Error": "File not found"}), 404
+    
+    lower_name = filename.lower()
+
+    try:
+        if lower_name.endswith(".xlsx"):
+            df = pd.read_excel(filepath, engine="openpyxl")
+        elif lower_name.endswith(".csv"):
+            df = pd.read_csv(filepath)
+        else:
+            return jsonify({"error": "Unsupported file type"}), 400
+        
+        df = df[selected_columns]
+        df = df.fillna("")
+
+        return jsonify({
+            "message": "Processing successful", 
+            "columns": selected_columns,
+            "rows": df.to_dict(orient="records")
+        }), 200
+    
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    
 
 if __name__ == "__main__":
     app.run(debug=True)

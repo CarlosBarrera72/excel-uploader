@@ -96,6 +96,9 @@ processBtn.addEventListener("click", async () => {
 
         const result = await response.json();
 
+        console.log("process result:", result);
+        console.log("response ok:", response.ok);
+
         if (!response.ok) {
             statusText.textContent = result.error || "Processing failed.";
             return;
