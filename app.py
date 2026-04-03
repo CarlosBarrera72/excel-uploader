@@ -1,5 +1,5 @@
-from flask import Flask, render_template, request, jsonify
-import pandas as pd
+from flask import Flask, render_template, request, jsonify # type: ignore
+import pandas as pd # type: ignore
 import os 
 
 app = Flask(__name__)
@@ -103,7 +103,7 @@ def process_file():
     print("RAW JSON:", data)
 
     if not data:
-        return jsonify({"error": "No JSON data recieved"}), 400
+        return jsonify({"error": "No JSON data received"}), 400
     
     filename = data.get("filename")
     header_row_index = data.get("header_row_index")
