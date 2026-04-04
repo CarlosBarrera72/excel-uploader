@@ -111,13 +111,15 @@ def process_file():
 
     if filename is None or header_row_index is None or not selected_columns:
         return jsonify({"error": "Missing filename, header row index, or selected columns"}), 400
-    
+        
     filepath = os.path.join(str(UPLOAD_FOLDER), str(filename))
 
     if not os.path.exists(filepath):
         return jsonify({"Error": "File not found"}), 404
     
     lower_name = filename.lower()
+
+    print("JSON BEING PROCESSED", data)
 
     try:
         if lower_name.endswith(".xlsx"):
@@ -133,7 +135,7 @@ def process_file():
         header = [str(h).strip() for h in headers]
 
         df = df.iloc[header_row_index + 1:].reset_index(drop=True)
-        df.columns = headers
+        df.columns = header
 
         df = df[selected_columns]
         df = df.fillna("")
