@@ -1,4 +1,5 @@
-from flask import Flask, render_template, request, jsonify # type: ignore
+from flask import Flask, render_template, request, jsonify, send_file # type: ignore
+from io import BytesIO
 import pandas as pd # type: ignore
 import os 
 
@@ -149,6 +150,46 @@ def process_file():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
     
+@app.route("/download/<fileName>", methods=["GET"])
+def download_file(fileName):
+    
+    file_path = os.path.join(app.config["UPLOAD_FOLDER"], fileName)
+
+    if not os.path.exists(file_path):
+        return jsonify({"error": "No File Name"}), 404
+
+    try:
+
+        allowed_extensions = (".xlsx", ".xls")
+
+        name, ext = os.path.splitext(fileName)
+        ext = ext.lower()
+
+        if ext not in allowed_extensions:
+            return jsonify({"error":"File Type not supported"}), 400
+        
+        df = pd.read_excel(file_path)
+
+        csv_filename = name + ".csv"
+
+        csv_buffer = BytesIO()
+        csv_string = df.to_csv(index=False)
+        csv_buffer.write(csv_string.encode())
+        
+    except Exception as e:
+        print(e)
+        return jsonify({"error": "Failed to process file"}), 500
+    
+    csv_buffer.seek(0)
+
+    return send_file(
+        csv_buffer,
+        as_attachment=True,
+        download_name=csv_filename,
+        mimetype="text/csv"
+    )
+
+
 
 if __name__ == "__main__":
     app.run(debug=True)
