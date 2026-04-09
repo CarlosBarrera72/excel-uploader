@@ -28,10 +28,12 @@ def upload_file():
 
     data_store[file.filename] = df
 
+    preview_rows = df.head(10).values.tolist()
+
     return jsonify({
-        "success" : 'file upload successful',
+        "message" : 'File upload successful',
         "filename" : file.filename,
-        "columns" : df.columns.tolist()
+        "preview_rows" : preview_rows
     })
    
 
@@ -47,34 +49,40 @@ def set_header():
 
     if filename is None or header_row_index is None:
         return jsonify({"error": "Missing filename or header row index"}), 400
+    
+    try: 
+        header_row_index = int(header_row_index)
+    except (ValueError, TypeError):
+        return jsonify({"error": "Header row index must be a number"})
 
-    filepath = os.path.join(UPLOAD_FOLDER, filename)
-
-    if not os.path.exists(filepath):
+    if filename not in data_store:
         return jsonify({"error": "File not found"}), 404
 
-    lower_name = filename.lower()
-
     try:
-        if lower_name.endswith(".xlsx"):
-            df = pd.read_excel(filepath, header=None, engine="openpyxl")
-        elif lower_name.endswith(".csv"):
-            df = pd.read_csv(filepath, header=None)
-        else:
-            return jsonify({"error": "Unsupported file type"}), 400
+        df = data_store[filename]
 
+        if header_row_index < 0 or header_row_index>= len(df):
+            return jsonify({"error": "Header row index out of range"}), 400
+        
         df = df.fillna("")
 
         headers = df.iloc[header_row_index].tolist()
-        headers = [str(h).strip() for h in headers]
+
+        headers = [
+            str(h).strip() if str(h).strip() else f"coulmn_{i}"
+            for i, h in enumerate(headers)
+        ]
 
         df = df.iloc[header_row_index + 1:].reset_index(drop=True)
         df.columns = headers
 
+        data_store[filename] = df
+
         return jsonify({
             "message": "Header row set successfully",
             "filename": filename,
-            "columns": headers
+            "columns": headers,
+            "preview": df.head(10).to_dict(orient="records")
         }), 200
 
     except Exception as e:
@@ -85,36 +93,28 @@ def set_header():
 def process_file():
     data = request.get_json()
 
+    if not data:
+        return jsonify({"error": "No JSON data received"}), 400
+
     filename = data.get("filename")
     header_row_index = data.get("header_row_index")
     selected_columns = data.get("selected_columns")    
-
-    if not data:
-        return jsonify({"error": "No JSON data received"}), 400
+    
+    if filename is None or header_row_index is None:
+        return jsonify({"error":"Missing filename or header row index"}), 400
     
     if not selected_columns:
         return jsonify({"error": "No column selected"}), 400
-
+    try:
+        header_row_index = int(header_row_index)
+    except(ValueError, TypeError):
+        return jsonify({"error": "Header row index must be a number"}), 400
+    
     if filename not in data_store:
         return jsonify({"error": "File not found"}), 404
     
-    if header_row_index is None:
-        return jsonify({"error":"Header row index missing"}), 400
-    
-    if header_row_index >= len(df) or header_row_index < 0 :
-        return jsonify({"error": "Header row index out of range"}), 400
-
     try:
         df = data_store[filename].copy()
-        headers = df.iloc[header_row_index].tolist()
-        header = [str(h).strip() for h in headers]
-
-        df = df.iloc[header_row_index + 1:]
-
-        df = df.reset_index(drop=True)
-
-        df.columns = header
-
         df = df[selected_columns]
 
         return jsonify({
