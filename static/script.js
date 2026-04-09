@@ -10,6 +10,7 @@ const previewTableContainer = document.getElementById("preview-table-container")
 const columnsSection = document.getElementById("columns-section");
 const columnsList = document.getElementById("columns-list");
 const processBtn = document.getElementById("process-btn");
+const downloadBtn = document.getElementById("download-btn")
 
 const tableSection = document.getElementById("table-section");
 const tableContainer = document.getElementById("table-container");
@@ -211,7 +212,6 @@ processBtn.addEventListener("click", async () => {
             },
             body: JSON.stringify({
                 filename: currentFilename,
-                header_row_index: currentHeaderRowIndex,
                 selected_columns: selectedColumns
             })
         });
@@ -226,11 +226,21 @@ processBtn.addEventListener("click", async () => {
 
         statusText.textContent = result.message;
         renderProcessedTable(result.columns, result.rows);
+        downloadBtn.classList.remove("hidden");
 
     } catch (error) {
         console.error(error);
         statusText.textContent = "Something went wrong during processing.";
     }
+});
+
+downloadBtn.addEventListener("click", () => {
+    if (!currentFilename) {
+        statusText.textContent = "No file available to download.";
+        return;
+    }
+
+    window.location.href = `/download/${encodeURIComponent(currentFilename)}`;
 });
 
 function renderProcessedTable(columns, rows) {

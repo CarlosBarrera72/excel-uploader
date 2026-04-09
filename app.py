@@ -6,6 +6,8 @@ import os
 app = Flask(__name__)
 
 data_store = {}
+processed_data_store = {}
+header_store = {}
 
 UPLOAD_FOLDER= "uploads"
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
@@ -47,47 +49,33 @@ def set_header():
     filename = data.get("filename")
     header_row_index = data.get("header_row_index")
 
-    if filename is None or header_row_index is None:
-        return jsonify({"error": "Missing filename or header row index"}), 400
-    
-    try: 
-        header_row_index = int(header_row_index)
-    except (ValueError, TypeError):
-        return jsonify({"error": "Header row index must be a number"})
-
     if filename not in data_store:
         return jsonify({"error": "File not found"}), 404
 
     try:
-        df = data_store[filename]
+        df = data_store[filename].copy()
 
-        if header_row_index < 0 or header_row_index>= len(df):
+        if header_row_index < 0 or header_row_index >= len(df):
             return jsonify({"error": "Header row index out of range"}), 400
-        
-        df = df.fillna("")
 
         headers = df.iloc[header_row_index].tolist()
-
-        headers = [
-            str(h).strip() if str(h).strip() else f"coulmn_{i}"
-            for i, h in enumerate(headers)
-        ]
+        headers = [str(h).strip() for h in headers]
 
         df = df.iloc[header_row_index + 1:].reset_index(drop=True)
         df.columns = headers
 
-        data_store[filename] = df
+        header_store[filename] = df.copy()
 
         return jsonify({
             "message": "Header row set successfully",
             "filename": filename,
-            "columns": headers,
-            "preview": df.head(10).to_dict(orient="records")
-        }), 200
+            "columns": df.columns.tolist(),
+            "preview": df.head(5).to_dict(orient="records")
+        })
 
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
+        print("SET HEADER ERROR:", e)
+        return jsonify({"error": "Failed to set header row"}), 500
 
 @app.route("/process", methods=["POST"])
 def process_file():
@@ -97,74 +85,65 @@ def process_file():
         return jsonify({"error": "No JSON data received"}), 400
 
     filename = data.get("filename")
-    header_row_index = data.get("header_row_index")
-    selected_columns = data.get("selected_columns")    
-    
-    if filename is None or header_row_index is None:
-        return jsonify({"error":"Missing filename or header row index"}), 400
-    
+    selected_columns = data.get("selected_columns")
+
+    if filename is None:
+        return jsonify({"error": "Missing filename"}), 400
+
     if not selected_columns:
-        return jsonify({"error": "No column selected"}), 400
+        return jsonify({"error": "No columns selected"}), 400
+
+    if filename not in header_store:
+        return jsonify({"error": "Header row has not been set"}), 404
+
     try:
-        header_row_index = int(header_row_index)
-    except(ValueError, TypeError):
-        return jsonify({"error": "Header row index must be a number"}), 400
-    
-    if filename not in data_store:
-        return jsonify({"error": "File not found"}), 404
-    
-    try:
-        df = data_store[filename].copy()
+        df = header_store[filename].copy()
+
+        print("PROCESS DF COLUMNS:", df.columns.tolist())
+        print("SELECTED COLUMNS:", selected_columns)
+
         df = df[selected_columns]
+
+        processed_data_store[filename] = df.copy()
 
         return jsonify({
             "message": "Selection processed",
-            "columns": selected_columns,
-            "rows" : df.to_dict(orient="records")
+            "columns": df.columns.tolist(),
+            "rows": df.to_dict(orient="records")
         })
+
     except Exception as e:
-        return jsonify({"error": "No file to process"}), 500
+        print("PROCESS ERROR:", e)
+        return jsonify({"error": str(e)}), 500
     
 @app.route("/download/<fileName>", methods=["GET"])
 def download_file(fileName):
-    
-    file_path = os.path.join(app.config["UPLOAD_FOLDER"], fileName)
-
-    if not os.path.exists(file_path):
-        return jsonify({"error": "No File Name"}), 404
+    if fileName not in processed_data_store:
+        return jsonify({"error": "No processed file available to download"}), 404
 
     try:
+        df = processed_data_store[fileName]
 
-        allowed_extensions = (".xlsx", ".xls")
+        excel_buffer = BytesIO()
+
+        with pd.ExcelWriter(excel_buffer, engine="openpyxl") as writer:
+            df.to_excel(writer, index=False, sheet_name="Processed Data")
+
+        excel_buffer.seek(0)
 
         name, ext = os.path.splitext(fileName)
-        ext = ext.lower()
+        download_name = f"{name}_processed.xlsx"
 
-        if ext not in allowed_extensions:
-            return jsonify({"error":"File Type not supported"}), 400
-        
-        df = pd.read_excel(file_path)
+        return send_file(
+            excel_buffer,
+            as_attachment=True,
+            download_name=download_name,
+            mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
 
-        csv_filename = name + ".csv"
-
-        csv_buffer = BytesIO()
-        csv_string = df.to_csv(index=False)
-        csv_buffer.write(csv_string.encode())
-        
     except Exception as e:
-        print(e)
-        return jsonify({"error": "Failed to process file"}), 500
-    
-    csv_buffer.seek(0)
-
-    return send_file(
-        csv_buffer,
-        as_attachment=True,
-        download_name=csv_filename,
-        mimetype="text/csv"
-    )
-
-
+        print("DOWNLOAD ERROR:", e)
+        return jsonify({"error": "Failed to generate download"}), 500
 
 if __name__ == "__main__":
     app.run(debug=True)
