@@ -71,7 +71,11 @@ uploadForm.addEventListener("submit", async (event) => {
 });
 
 printBtn.addEventListener("click",()=>{
-    
+
+    if(outputTable.getElementsByTagName("table").length === 0){
+        console.log("no data");
+        return;
+    }
     //check if printable table exists
 
     /*
@@ -117,8 +121,15 @@ function preparePrintView(){
 }
 
 function resotreView(){
-    
-    //reset anything changed for printing
+    /*
+    ensure main application view is visible
+
+    ensure print-specific elements do not affect  normal layout
+
+    maintain table display if it was already show
+
+    do no reset or remove processed data
+    */
 
 }
 
