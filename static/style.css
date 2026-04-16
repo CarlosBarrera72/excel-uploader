@@ -83,3 +83,7 @@ th {
 #table-container {
     overflow-x: auto;
 }
+
+@media print {
+    /* control what shows during print */
+}

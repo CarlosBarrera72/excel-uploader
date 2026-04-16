@@ -15,6 +15,11 @@ const downloadBtn = document.getElementById("download-btn")
 const tableSection = document.getElementById("table-section");
 const tableContainer = document.getElementById("table-container");
 
+const printBtn = document.getElementById("print-btn")
+const printArea  = document.getElementById("print-area")
+const outputTable = document.getElementById("output-table")
+const printDate = document.getElementById("print-date")
+
 let currentFilename = "";
 let currentHeaderRowIndex = null;
 let selectedColumns = [];
@@ -64,6 +69,58 @@ uploadForm.addEventListener("submit", async (event) => {
         statusText.textContent = "Something went wrong during upload.";
     }
 });
+
+printBtn.addEventListener("click",()=>{
+    
+    //check if printable table exists
+
+    /*
+    get output table container 
+
+    if output table is empty
+        show message to user ("No data to print")
+        stop execution
+        
+    if output table does not contain a table
+        show message to user ("No valid table to print")
+        stop execution 
+    */
+
+    //prepare print view
+
+    /* 
+    set current date text 
+
+    make sure print area contains correct content
+
+    enruse only printable section will be shown (handled with css)
+    */
+
+    //trigger print
+
+    // call browser print function 
+
+    //restore view
+
+    // reset any temporary change if needed
+    
+});
+
+function preparePrintView(){
+    /* 
+    get current date and time
+
+    format date text
+
+    place formatted date text into print date element
+    */
+}
+
+function resotreView(){
+    
+    //reset anything changed for printing
+
+}
 
 function renderPreviewTable(rows) {
     previewSection.classList.remove("hidden");
