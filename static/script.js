@@ -76,6 +76,11 @@ printBtn.addEventListener("click",()=>{
         console.log("no data");
         return;
     }
+
+    preparePrintView();
+    window.print();
+    restoreView();
+
     //check if printable table exists
 
     /*
@@ -120,7 +125,7 @@ function preparePrintView(){
     */
 }
 
-function resotreView(){
+function restoreView(){
     /*
     ensure main application view is visible
 
